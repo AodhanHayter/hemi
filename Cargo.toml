@@ -6,3 +6,5 @@ authors = ["Aodhan Hayter <aodhan.hayter@gmail.com>"]
 [dependencies]
 clap = "2.26.2"
 reqwest = "0.8.0"
+tar = "0.4"
+libflate = "0.1"

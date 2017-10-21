@@ -1,4 +1,8 @@
 extern crate clap;
+extern crate reqwest;
+extern crate tar;
+extern crate libflate;
+
 mod cmd;
 
 use clap::{App};

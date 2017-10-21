@@ -1,12 +1,12 @@
-extern crate clap;
-extern crate reqwest;
-
 use std::env::{home_dir};
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::fs::{File, create_dir_all};
 use std::io::prelude::*;
-use std::io::{Read, Error, Write};
+use std::io::{Read, Write};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use reqwest::{get, Response};
+use tar::Archive;
+use libflate::gzip;
 
 static NODE_BASE: &'static str = "https://nodejs.org/dist";
 
@@ -30,25 +30,39 @@ fn install_version(version: &str) {
     println!("Installing node.js at {}", version);
     match get_install_location(version) {
         Ok(mut install_path) => download_version(&version, &mut install_path),
-        Err(err)         => println!("{:?}", err)
+        Err(err)             => println!("{:?}", err)
     }
 }
 
 fn download_version (version: &str, install_path: &mut PathBuf) {
     let url = build_url(&version);
-    match reqwest::get(&url) {
+    match get(&url) {
         Ok(resp) => write_file(resp, version, install_path),
         Err(err) => println!("{:?}", err)
     }
 }
 
-fn write_file (mut resp: reqwest::Response, version: &str, install_path: &mut PathBuf) {
+fn write_file (mut resp: Response, version: &str, install_path: &mut PathBuf) {
     install_path.push(version);
-    let mut buf = Vec::new();
+    let mut buf = vec![];
     resp.read_to_end(&mut buf).unwrap();
-    File::create(install_path)
+
+    let mut decoder = gzip::Decoder::new(buf.as_slice()).unwrap();
+    let mut dcomp_data = Vec::new();
+    decoder.read_to_end(&mut dcomp_data).unwrap();
+
+    File::create(&install_path)
         .map_err(|err| println!("{:?}", err))
-        .map(|mut file| file.write_all(&buf).unwrap())
+        .map(|mut file| {
+          file.write_all(&dcomp_data).unwrap();
+          println!("{}", version);
+          let mut archive = Archive::new(File::open(&install_path).unwrap());
+          archive.unpack(&install_path).unwrap();
+          // for file in archive.entries().unwrap() {
+          //     let mut f = file.unwrap();
+          //     println!("{:?}", f.header().path().unwrap());
+          // }
+        })
         .unwrap();
 }
 
@@ -61,7 +75,7 @@ fn get_install_location (version: &str) -> Result<PathBuf, String>{
     home_dir().ok_or_else(|| "No Home Directory Found")
         .map_err(|err| err.to_string())
         .map(|mut home_path| {
-            home_path.push(".nom/".to_string() + version);
+            home_path.push(".hemi/".to_string() + version);
             if home_path.exists() {
                 home_path
             } else {
