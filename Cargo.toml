@@ -1,0 +1,8 @@
+[package]
+name = "nom"
+version = "0.1.0"
+authors = ["Aodhan Hayter <aodhan.hayter@gmail.com>"]
+
+[dependencies]
+clap = "2.26.2"
+reqwest = "0.8.0"
