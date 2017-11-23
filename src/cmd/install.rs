@@ -1,5 +1,5 @@
 use std::env::{home_dir};
-use std::path::{PathBuf};
+use std::path::{Path, PathBuf};
 use std::fs::{File, create_dir_all};
 use std::io::prelude::*;
 use std::io::{Read, Write};
@@ -35,35 +35,32 @@ fn install_version(version: &str) {
 }
 
 fn download_version (version: &str, install_path: &mut PathBuf) {
+    install_path.push(version);
     let url = build_url(&version);
+    let download_filepath = Path::new(&install_path);
     match get(&url) {
-        Ok(resp) => write_file(resp, version, install_path),
+        Ok(resp) => write_file(resp, &download_filepath),
         Err(err) => println!("{:?}", err)
     }
 }
 
-fn write_file (mut resp: Response, version: &str, install_path: &mut PathBuf) {
-    install_path.push(version);
+fn write_file (mut resp: Response, download_filepath: &Path) {
+    let install_dir = download_filepath.parent().unwrap();
     let mut buf = vec![];
     resp.read_to_end(&mut buf).unwrap();
-
     let mut decoder = gzip::Decoder::new(buf.as_slice()).unwrap();
     let mut dcomp_data = Vec::new();
     decoder.read_to_end(&mut dcomp_data).unwrap();
-
-    File::create(&install_path)
+    File::create(&download_filepath)
         .map_err(|err| println!("{:?}", err))
         .map(|mut file| {
           file.write_all(&dcomp_data).unwrap();
-          println!("{}", version);
-          let mut archive = Archive::new(File::open(&install_path).unwrap());
-          archive.unpack(&install_path).unwrap();
-          // for file in archive.entries().unwrap() {
-          //     let mut f = file.unwrap();
-          //     println!("{:?}", f.header().path().unwrap());
-          // }
-        })
-        .unwrap();
+          let mut archive = Archive::new(File::open(&download_filepath).unwrap());
+          match archive.unpack(&install_dir) {
+            Ok(_) => println!("Unpacked binary"),
+            Err(err) => println!("{:?}", err)
+          }
+        }).unwrap();
 }
 
 fn build_url (version: &str) -> String {
@@ -72,7 +69,8 @@ fn build_url (version: &str) -> String {
 }
 
 fn get_install_location (version: &str) -> Result<PathBuf, String>{
-    home_dir().ok_or_else(|| "No Home Directory Found")
+    home_dir()
+        .ok_or_else(|| "No Home Directory Found")
         .map_err(|err| err.to_string())
         .map(|mut home_path| {
             home_path.push(".hemi/".to_string() + version);
